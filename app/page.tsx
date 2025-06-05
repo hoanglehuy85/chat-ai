@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -15,6 +15,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<{ question: string; answer: string; created_at?: string }[]>([]);
   const [count, setCount] = useState<number | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [streamingAnswer, setStreamingAnswer] = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -30,23 +32,27 @@ export default function Home() {
     };
   }, []);
 
-useEffect(() => {
-  const fetchHistory = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const { data: history } = await supabase
-      .from('chat_history')
-      .select('*')
-      .eq('email', user.email)
-      .gte('created_at', today.toISOString())
-      .order('created_at', { ascending: false });
+      const { data: history } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('email', user.email)
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: true });
 
-    setHistory(history || []);
-  };
+      setHistory(history || []);
+    };
 
-  if (user) fetchHistory();
-}, [user]);
+    if (user) fetchHistory();
+  }, [user]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history, streamingAnswer]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' });
@@ -63,92 +69,95 @@ useEffect(() => {
     }
 
     setLoading(true);
+    setStreamingAnswer('');
+
     const res = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: input,
-        userEmail: user.email,
-      }),
+      body: JSON.stringify({ question: input, userEmail: user.email })
     });
 
-    const data = await res.json();
-    setResponse(data.answer);
-    setLoading(false);
-    setHistory([{ question: input, answer: data.answer }, ...history]);
+    const reader = res.body?.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let result = '';
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        result += decoder.decode(value);
+        setStreamingAnswer(result);
+      }
+    }
+
+    setResponse(result);
+    setHistory([...history, { question: input, answer: result, created_at: new Date().toISOString() }]);
     setCount((prev) => (prev ?? 0) + 1);
+    setInput('');
+    setLoading(false);
   };
 
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <h1 className="text-2xl font-bold mb-4">Chào bạn!</h1>
-        <button
-          onClick={signInWithGoogle}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Đăng nhập với Google
-        </button>
+        <button onClick={signInWithGoogle} className="px-4 py-2 bg-blue-600 text-white rounded">Đăng nhập với Google</button>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="flex flex-col h-screen max-w-2xl mx-auto p-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl">Xin chào, {user.email}</h2>
         <button onClick={signOut} className="text-red-500 underline">Đăng xuất</button>
       </div>
-      <textarea
-        rows={3}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Bạn muốn hỏi gì?"
-        className="w-full p-2 border rounded mb-4"
-      />
-      <button
-        onClick={handleAsk}
-        className="px-4 py-2 bg-green-600 text-white rounded"
-        disabled={loading}
-      >
-        {loading ? 'Đang hỏi...' : 'Hỏi AI'}
-      </button>
-      {response && (
-        <div className="mt-4 p-4 bg-gray-100 border rounded whitespace-pre-wrap">
-          {response}
-        </div>
-      )}
-      {history.length > 0 && (
-        <div className="mt-6">
-          <h3 className="font-bold mb-2">Lịch sử gần đây:</h3>
-          <ul className="space-y-2">
-            {history.map((item, index) => (
-  <div key={index} className="mb-4">
-    {/* Câu hỏi của người dùng */}
-    <div className="flex justify-end">
-      <div className="bg-blue-500 text-white p-3 rounded-lg max-w-sm">
-        <p>{item.question}</p>
-        <p className="text-xs text-right mt-1 opacity-70">
-          {new Date(item.created_at!).toLocaleTimeString()}
-        </p>
+      <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+        {history.map((item, index) => (
+          <div key={index}>
+            <div className="flex justify-end">
+              <div className="bg-blue-500 text-white p-3 rounded-lg max-w-sm">
+                <p>{item.question}</p>
+                <p className="text-xs text-right mt-1 opacity-70">
+                  {item.created_at ? new Date(item.created_at).toLocaleTimeString() : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-start mt-2">
+              <div className="bg-gray-200 text-black p-3 rounded-lg max-w-sm">
+                <p>{item.answer}</p>
+                <p className="text-xs text-right mt-1 opacity-60">
+                  {item.created_at ? new Date(item.created_at).toLocaleTimeString() : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+        {streamingAnswer && (
+          <div className="flex justify-start">
+            <div className="bg-gray-200 text-black p-3 rounded-lg max-w-sm animate-pulse">
+              <p>{streamingAnswer}</p>
+            </div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
       </div>
-    </div>
-
-    {/* Trả lời từ AI */}
-    <div className="flex justify-start mt-2">
-      <div className="bg-gray-200 text-black p-3 rounded-lg max-w-sm">
-        <p>{item.answer}</p>
-        <p className="text-xs text-right mt-1 opacity-60">
-          {new Date(item.created_at!).toLocaleTimeString()}
-        </p>
+      <div className="mt-auto">
+        <textarea
+          rows={2}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Bạn muốn hỏi gì?"
+          className="w-full p-2 border rounded mb-2"
+        />
+        <button
+          onClick={handleAsk}
+          className="w-full px-4 py-2 bg-green-600 text-white rounded"
+          disabled={loading || !input.trim()}
+        >
+          {loading ? 'Đang hỏi...' : 'Hỏi AI'}
+        </button>
       </div>
-    </div>
-  </div>
-))}
-
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
