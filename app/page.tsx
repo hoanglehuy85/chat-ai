@@ -30,22 +30,23 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchHistory = async () => {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('question, answer')
-        .eq('user_email', user.email)
-        .order('timestamp', { ascending: false })
-        .limit(10);
-      if (!error) {
-        setHistory(data || []);
-        setCount(data?.length || 0);
-      }
-    };
-    fetchHistory();
-  }, [user]);
+useEffect(() => {
+  const fetchHistory = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data: history } = await supabase
+      .from('chat_history')
+      .select('*')
+      .eq('email', user.email)
+      .gte('created_at', today.toISOString())
+      .order('created_at', { ascending: false });
+
+    setHistory(history || []);
+  };
+
+  if (user) fetchHistory();
+}, [user]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' });

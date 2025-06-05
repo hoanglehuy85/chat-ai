@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     const { error } = await supabase.from('messages').insert([
      {
     user_email: body.userEmail,
+    created_at: new Date().toISOString(),
     question,
     answer: text,
      },
