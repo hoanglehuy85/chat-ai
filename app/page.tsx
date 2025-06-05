@@ -14,8 +14,8 @@ export default function Home() {
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<{ question: string; answer: string }[]>([]);
+  const [count, setCount] = useState<number | null>(null);
 
-  // Lấy user hiện tại
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
@@ -30,24 +30,22 @@ export default function Home() {
     };
   }, []);
 
-  // Lấy lịch sử chat khi đã có user
   useEffect(() => {
+    if (!user) return;
     const fetchHistory = async () => {
-      if (user?.email) {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('question, answer')
-          .eq('user_email', user.email)
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          setHistory(data);
-        }
+      const { data, error } = await supabase
+        .from('messages')
+        .select('question, answer')
+        .eq('user_email', user.email)
+        .order('timestamp', { ascending: false })
+        .limit(10);
+      if (!error) {
+        setHistory(data || []);
+        setCount(data?.length || 0);
       }
     };
-
     fetchHistory();
-  }, [user?.email]);
+  }, [user]);
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({ provider: 'google' });
@@ -56,32 +54,13 @@ export default function Home() {
   const signOut = async () => {
     await supabase.auth.signOut();
   };
-const checkLimit = async () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { count, error } = await supabase
-    .from('messages')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_email', user.email)
-    .gte('created_at', today.toISOString());
-
-  if (error) {
-    console.error('Lỗi khi kiểm tra giới hạn:', error);
-    return false;
-  }
-
-  return count < 10;
-};
 
   const handleAsk = async () => {
-   const canAsk = await checkLimit();
-  if (!canAsk) {
-    alert('Bạn đã đạt giới hạn 10 câu hỏi hôm nay. Quay lại vào ngày mai nhé!');
-    return;
-  }
+    if (count !== null && count >= 10) {
+      alert('Bạn đã hết 10 tin nhắn miễn phí hôm nay.');
+      return;
+    }
 
-  setLoading(true);
     setLoading(true);
     const res = await fetch('/api/ask', {
       method: 'POST',
@@ -94,11 +73,9 @@ const checkLimit = async () => {
 
     const data = await res.json();
     setResponse(data.answer);
-    setInput('');
     setLoading(false);
-
-    // Cập nhật lịch sử mới nhất
     setHistory([{ question: input, answer: data.answer }, ...history]);
+    setCount((prev) => (prev ?? 0) + 1);
   };
 
   if (!user) {
@@ -135,24 +112,23 @@ const checkLimit = async () => {
       >
         {loading ? 'Đang hỏi...' : 'Hỏi AI'}
       </button>
-
       {response && (
         <div className="mt-4 p-4 bg-gray-100 border rounded whitespace-pre-wrap">
           {response}
         </div>
       )}
-
       {history.length > 0 && (
-        <div className="mt-8">
-          <h2 className="font-semibold mb-2">📜 Lịch sử chat của bạn:</h2>
-          <div className="space-y-4">
+        <div className="mt-6">
+          <h3 className="font-bold mb-2">Lịch sử gần đây:</h3>
+          <ul className="space-y-2">
             {history.map((item, index) => (
-              <div key={index} className="border p-3 rounded bg-white">
-                <p><strong>🗨️ Bạn:</strong> {item.question}</p>
-                <p><strong>🤖 AI:</strong> {item.answer}</p>
-              </div>
+              <li key={index} className="border p-2 rounded bg-gray-50">
+                <strong>Q:</strong> {item.question}
+                <br />
+                <strong>A:</strong> {item.answer}
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>
