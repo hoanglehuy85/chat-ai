@@ -123,12 +123,14 @@ useEffect(() => {
           <h3 className="font-bold mb-2">Lịch sử gần đây:</h3>
           <ul className="space-y-2">
             {history.map((item, index) => (
-              <li key={index} className="border p-2 rounded bg-gray-50">
-                <strong>Q:</strong> {item.question}
-                <br />
-                <strong>A:</strong> {item.answer}
-              </li>
-            ))}
+  <div key={index} className="p-2 border rounded mb-2">
+    <p className="text-sm text-gray-500">
+      🕒 {new Date(item.created_at).toLocaleString()}
+    </p>
+    <p><strong>Q:</strong> {item.question}</p>
+    <p><strong>A:</strong> {item.answer}</p>
+  </div>
+))}
           </ul>
         </div>
       )}
