@@ -123,14 +123,29 @@ useEffect(() => {
           <h3 className="font-bold mb-2">Lịch sử gần đây:</h3>
           <ul className="space-y-2">
             {history.map((item, index) => (
-  <div key={index} className="p-2 border rounded mb-2">
-    <p className="text-sm text-gray-500">
-      🕒 {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
-    </p>
-    <p><strong>Q:</strong> {item.question}</p>
-    <p><strong>A:</strong> {item.answer}</p>
+  <div key={index} className="mb-4">
+    {/* Câu hỏi của người dùng */}
+    <div className="flex justify-end">
+      <div className="bg-blue-500 text-white p-3 rounded-lg max-w-sm">
+        <p>{item.question}</p>
+        <p className="text-xs text-right mt-1 opacity-70">
+          {new Date(item.created_at!).toLocaleTimeString()}
+        </p>
+      </div>
+    </div>
+
+    {/* Trả lời từ AI */}
+    <div className="flex justify-start mt-2">
+      <div className="bg-gray-200 text-black p-3 rounded-lg max-w-sm">
+        <p>{item.answer}</p>
+        <p className="text-xs text-right mt-1 opacity-60">
+          {new Date(item.created_at!).toLocaleTimeString()}
+        </p>
+      </div>
+    </div>
   </div>
 ))}
+
           </ul>
         </div>
       )}
