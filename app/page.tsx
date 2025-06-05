@@ -125,7 +125,7 @@ useEffect(() => {
             {history.map((item, index) => (
   <div key={index} className="p-2 border rounded mb-2">
     <p className="text-sm text-gray-500">
-      🕒 {new Date(item.created_at).toLocaleString()}
+      🕒 {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
     </p>
     <p><strong>Q:</strong> {item.question}</p>
     <p><strong>A:</strong> {item.answer}</p>
