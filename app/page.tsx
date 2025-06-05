@@ -13,7 +13,7 @@ export default function Home() {
   const [input, setInput] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<{ question: string; answer: string }[]>([]);
+  const [history, setHistory] = useState<{ question: string; answer: string; created_at?: string }[]>([]);
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
